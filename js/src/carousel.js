@@ -1,3 +1,6 @@
+import Data from './dom/data'
+import EventHandler from './dom/eventHandler'
+import SelectorEngine from './dom/selectorEngine'
 import Util from './util'
 
 
@@ -104,7 +107,7 @@ const Carousel = (($) => {
 
       this._config            = this._getConfig(config)
       this._element           = $(element)[0]
-      this._indicatorsElement = $(this._element).find(Selector.INDICATORS)[0]
+      this._indicatorsElement = SelectorEngine.find(this._element, Selector.INDICATORS)[0]
 
       this._addEventListeners()
     }
@@ -179,7 +182,6 @@ const Carousel = (($) => {
 
     to(index) {
       this._activeElement = $(this._element).find(Selector.ACTIVE_ITEM)[0]
-
       const activeIndex = this._getItemIndex(this._activeElement)
 
       if (index > this._items.length - 1 || index < 0) {
@@ -187,7 +189,7 @@ const Carousel = (($) => {
       }
 
       if (this._isSliding) {
-        $(this._element).one(Event.SLID, () => this.to(index))
+        EventHandler.one(this._element, Event.SLID, () => this.to(index))
         return
       }
 
@@ -206,7 +208,7 @@ const Carousel = (($) => {
 
     dispose() {
       $(this._element).off(EVENT_KEY)
-      $.removeData(this._element, DATA_KEY)
+      Data.removeData(this._element, DATA_KEY)
 
       this._items             = null
       this._config            = null
@@ -222,21 +224,22 @@ const Carousel = (($) => {
     // private
 
     _getConfig(config) {
-      config = $.extend({}, Default, config)
+      config = Util.extend(Util.extend({}, Default), config)
       Util.typeCheckConfig(NAME, config, DefaultType)
       return config
     }
 
     _addEventListeners() {
       if (this._config.keyboard) {
-        $(this._element)
-          .on(Event.KEYDOWN, (event) => this._keydown(event))
+        EventHandler
+          .on(this._element, Event.KEYDOWN, (event) => this._keydown(event))
       }
 
       if (this._config.pause === 'hover') {
-        $(this._element)
-          .on(Event.MOUSEENTER, (event) => this.pause(event))
-          .on(Event.MOUSELEAVE, (event) => this.cycle(event))
+        EventHandler
+          .on(this._element, Event.MOUSEENTER, (event) => this.pause(event))
+        EventHandler
+          .on(this._element, Event.MOUSELEAVE, (event) => this.cycle(event))
         if ('ontouchstart' in document.documentElement) {
           // if it's a touch-enabled device, mouseenter/leave are fired as
           // part of the mouse compatibility events on first tap - the carousel
@@ -245,13 +248,14 @@ const Carousel = (($) => {
           // (as if it's the second time we tap on it, mouseenter compat event
           // is NOT fired) and after a timeout (to allow for mouse compatibility
           // events to fire) we explicitly restart cycling
-          $(this._element).on(Event.TOUCHEND, () => {
-            this.pause()
-            if (this.touchTimeout) {
-              clearTimeout(this.touchTimeout)
-            }
-            this.touchTimeout = setTimeout((event) => this.cycle(event), TOUCHEVENT_COMPAT_WAIT + this._config.interval)
-          })
+          EventHandler
+            .on(this._element, Event.TOUCHEND, () => {
+              this.pause()
+              if (this.touchTimeout) {
+                clearTimeout(this.touchTimeout)
+              }
+              this.touchTimeout = setTimeout((event) => this.cycle(event), TOUCHEVENT_COMPAT_WAIT + this._config.interval)
+            })
         }
       }
     }
@@ -303,16 +307,13 @@ const Carousel = (($) => {
     _triggerSlideEvent(relatedTarget, eventDirectionName) {
       const targetIndex = this._getItemIndex(relatedTarget)
       const fromIndex = this._getItemIndex($(this._element).find(Selector.ACTIVE_ITEM)[0])
-      const slideEvent = $.Event(Event.SLIDE, {
+
+      return EventHandler.trigger(this._element, Event.SLIDE, {
         relatedTarget,
         direction: eventDirectionName,
         from: fromIndex,
         to: targetIndex
       })
-
-      $(this._element).trigger(slideEvent)
-
-      return slideEvent
     }
 
     _setActiveIndicatorElement(element) {
@@ -326,7 +327,7 @@ const Carousel = (($) => {
         ]
 
         if (nextIndicator) {
-          $(nextIndicator).addClass(ClassName.ACTIVE)
+          nextIndicator.classList.add(ClassName.ACTIVE)
         }
       }
     }
@@ -359,7 +360,7 @@ const Carousel = (($) => {
       }
 
       const slideEvent = this._triggerSlideEvent(nextElement, eventDirectionName)
-      if (slideEvent.isDefaultPrevented()) {
+      if (slideEvent.defaultPrevented) {
         return
       }
 
@@ -376,44 +377,49 @@ const Carousel = (($) => {
 
       this._setActiveIndicatorElement(nextElement)
 
-      const slidEvent = $.Event(Event.SLID, {
-        relatedTarget: nextElement,
-        direction: eventDirectionName,
-        from: activeElementIndex,
-        to: nextElementIndex
-      })
-
       if (Util.supportsTransitionEnd() &&
-        $(this._element).hasClass(ClassName.SLIDE)) {
+        this._element.classList.contains(ClassName.SLIDE)) {
 
-        $(nextElement).addClass(orderClassName)
+        nextElement.classList.add(orderClassName)
 
         Util.reflow(nextElement)
 
-        $(activeElement).addClass(directionalClassName)
-        $(nextElement).addClass(directionalClassName)
+        activeElement.classList.add(directionalClassName)
+        nextElement.classList.add(directionalClassName)
 
-        $(activeElement)
-          .one(Util.TRANSITION_END, () => {
+        EventHandler
+          .one(activeElement, Util.TRANSITION_END, () => {
             $(nextElement)
-              .removeClass(`${directionalClassName} ${orderClassName}`)
-              .addClass(ClassName.ACTIVE)
+            .removeClass(`${directionalClassName} ${orderClassName}`)
+            .addClass(ClassName.ACTIVE)
 
             $(activeElement).removeClass(`${ClassName.ACTIVE} ${orderClassName} ${directionalClassName}`)
 
             this._isSliding = false
 
-            setTimeout(() => $(this._element).trigger(slidEvent), 0)
 
+            setTimeout(() => {
+              EventHandler.trigger(this._element, Event.SLID, {
+                relatedTarget: nextElement,
+                direction: eventDirectionName,
+                from: activeElementIndex,
+                to: nextElementIndex
+              })
+            }, 0)
           })
 
         Util.emulateTransitionEnd(activeElement, TRANSITION_DURATION)
       } else {
-        $(activeElement).removeClass(ClassName.ACTIVE)
-        $(nextElement).addClass(ClassName.ACTIVE)
+        activeElement.classList.remove(ClassName.ACTIVE)
+        nextElement.classList.add(ClassName.ACTIVE)
 
         this._isSliding = false
-        $(this._element).trigger(slidEvent)
+        EventHandler.trigger(this._element, Event.SLID, {
+          relatedTarget: nextElement,
+          direction: eventDirectionName,
+          from: activeElementIndex,
+          to: nextElementIndex
+        })
       }
 
       if (isCycling) {
@@ -461,13 +467,13 @@ const Carousel = (($) => {
         return
       }
 
-      const target = $(selector)[0]
+      const target = SelectorEngine.find(selector)[0]
 
-      if (!target || !$(target).hasClass(ClassName.CAROUSEL)) {
+      if (!target || target.classList.contains(ClassName.CAROUSEL)) {
         return
       }
 
-      const config     = $.extend({}, $(target).data(), $(this).data())
+      const config     = Util.extend(Util.extend({}, $(target).data()), $(this).data())
       const slideIndex = this.getAttribute('data-slide-to')
 
       if (slideIndex) {
@@ -492,10 +498,10 @@ const Carousel = (($) => {
    * ------------------------------------------------------------------------
    */
 
-  $(document)
-    .on(Event.CLICK_DATA_API, Selector.DATA_SLIDE, Carousel._dataApiClickHandler)
+  EventHandler
+    .on(document, Event.CLICK_DATA_API, Selector.DATA_SLIDE, Carousel._dataApiClickHandler)
 
-  $(window).on(Event.LOAD_DATA_API, () => {
+  EventHandler.on(window, Event.LOAD_DATA_API, () => {
     $(Selector.DATA_RIDE).each(function () {
       const $carousel = $(this)
       Carousel._jQueryInterface.call($carousel, $carousel.data())

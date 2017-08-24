@@ -88,6 +88,22 @@ const Util = (() => {
           }
         }
       }
+    },
+
+    extend(obj1, obj2) {
+      for (const secondProp in obj2) {
+        if (Object.prototype.hasOwnProperty.call(obj2, secondProp)) {
+          const secondVal = obj2[secondProp]
+          // Is this value an object?  If so, iterate over its properties, copying them over
+          if (secondVal && Object.prototype.toString.call(secondVal) === '[object Object]') {
+            obj1[secondProp] = obj1[secondProp] || {}
+            Util.extend(obj1[secondProp], secondVal)
+          } else {
+            obj1[secondProp] = secondVal
+          }
+        }
+      }
+      return obj1
     }
   }
 

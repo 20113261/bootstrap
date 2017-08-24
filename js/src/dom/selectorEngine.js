@@ -46,15 +46,28 @@ const SelectorEngine = {
     return fnMatches.call(element, selector)
   },
 
-  find(selector) {
-    if (typeof selector !== 'string') {
-      return null
+  find(element, selector) {
+    const elementIsSelector = typeof element === 'string'
+    if (elementIsSelector) {
+      selector = element
     }
 
     let selectorType = 'querySelectorAll'
     if (selector.indexOf('#') === 0) {
       selectorType = 'getElementById'
       selector = selector.substr(1, selector.length)
+    }
+
+    if (!elementIsSelector && selectorType !== 'getElementById') {
+      const elements = document[selectorType](selector)
+      const result = []
+      for (let i = 0; i < elements.length; i++) {
+        const tmpElement = elements[i]
+        if (element.contains(tmpElement)) {
+          result.push(tmpElement)
+        }
+      }
+      return result
     }
     return document[selectorType](selector)
   },
